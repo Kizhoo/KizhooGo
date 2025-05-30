@@ -9,37 +9,42 @@
       }
     }
   ],
-  "routes": [
+  "rewrites": [
     {
-      "src": "/api/search",
-      "dest": "https://searx.be/search",
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET,OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization"
-      }
+      "source": "/api/search",
+      "destination": "https://searx.be/search"
     },
     {
-      "src": "/api/duckduckgo",
-      "dest": "https://api.duckduckgo.com/",
-      "headers": {
-        "Access-Control-Allow-Origin": "*"
-      }
+      "source": "/api/duckduckgo",
+      "destination": "https://api.duckduckgo.com/"
     },
     {
-      "src": "/api/brave",
-      "dest": "https://api.search.brave.com/res/v1/web/search",
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "X-Subscription-Token": "YOUR_BRAVE_API_KEY"
-      }
+      "source": "/api/brave",
+      "destination": "https://api.search.brave.com/res/v1/web/search"
     },
     {
-      "src": "/(.*)",
-      "dest": "/index.html"
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ],
   "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, OPTIONS"
+        },
+        {
+          "key": "X-Subscription-Token",
+          "value": "YOUR_BRAVE_API_KEY"
+        }
+      ]
+    },
     {
       "source": "/(.*)",
       "headers": [
@@ -58,30 +63,8 @@
         {
           "key": "Referrer-Policy",
           "value": "strict-origin-when-cross-origin"
-        },
-        {
-          "key": "Permissions-Policy",
-          "value": "geolocation=(), microphone=(), camera=()"
         }
       ]
-    }
-  ],
-  "rewrites": [
-    {
-      "source": "/search",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/images",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/news",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/videos",
-      "destination": "/index.html"
     }
   ],
   "env": {
