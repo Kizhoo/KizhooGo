@@ -1,0 +1,4 @@
+This is a Brave Creators publisher verification file.
+
+Domain: kizhoo-gooo.vercel.app
+Token: 5da64fdcb1fed5a5c241a398b61168e9108791ecfef80444a28ac244a35fbe0e
