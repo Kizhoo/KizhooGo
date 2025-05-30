@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SearchNow - Mesin Pencari Pribadi</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/src/styles/style.css">
+  <link rel="icon" href="/public/favicon.ico" type="image/x-icon">
+</head>
+<body>
+  <div class="header">
+    <a href="/" class="logo">
+      <svg class="logo-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+        <path fill="currentColor" d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+      </svg>
+      <span>SearchNow</span>
+    </a>
+    <div class="nav-links">
+      <a href="#" class="nav-link">Beranda</a>
+      <a href="#" class="nav-link">Gambar</a>
+      <a href="#" class="nav-link">Berita</a>
+      <a href="#" class="nav-link">Video</a>
+      <a href="#" class="nav-link">Setelan</a>
+    </div>
+    <button class="theme-toggle" id="themeToggle">
+      <i class="fas fa-moon"></i>
+    </button>
+  </div>
+
+  <div class="search-section">
+    <h1 class="search-title">SearchNow</h1>
+    <div class="search-container">
+      <input type="text" class="search-input" id="searchInput" placeholder="Cari di web..." autocomplete="off" autofocus>
+      <button class="search-btn" id="searchButton">
+        <i class="fas fa-search"></i>
+      </button>
+    </div>
+    <div class="search-options">
+      <button class="search-type-btn active" data-type="web">
+        <svg class="search-type-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+          <path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+        </svg>
+        Web
+      </button>
+      <button class="search-type-btn" data-type="images">
+        <svg class="search-type-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+          <path fill="currentColor" d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
+        </svg>
+        Gambar
+      </button>
+      <button class="search-type-btn" data-type="news">
+        <svg class="search-type-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+          <path fill="currentColor" d="M14 4v7h-4V4H4v16h16V4h-6zM6 6h4v4H6V6zm0 10v-4h4v4H6zm6 2v-4h4v4h-4zm0-6V8h4v4h-4z"/>
+        </svg>
+        Berita
+      </button>
+      <button class="search-type-btn" data-type="videos">
+        <svg class="search-type-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+          <path fill="currentColor" d="M18 3v2h-2V3H8v2H6V3H4v18h2v-2h2v2h8v-2h2v2h2V3h-2zM8 17H6v-2h2v2zm0-4H6v-2h2v2zm0-4H6V7h2v2zm10 8h-2v-2h2v2zm0-4h-2v-2h2v2zm0-4h-2V7h2v2z"/>
+        </svg>
+        Video
+      </button>
+    </div>
+    <div class="search-info">
+      <i class="fas fa-shield-alt"></i> Pencarian Anda terlindungi - Privasi diutamakan
+    </div>
+    
+    <div class="search-suggestions" id="searchSuggestions">
+      <div class="suggestion">teknologi terkini</div>
+      <div class="suggestion">pemrograman web</div>
+      <div class="suggestion">AI dan machine learning</div>
+      <div class="suggestion">desain UI/UX</div>
+    </div>
+    
+    <div class="search-history" id="searchHistory">
+      <div class="history-title">Riwayat Pencarian</div>
+      <div id="historyList"></div>
+    </div>
+  </div>
+
+  <div class="results-section">
+    <div class="results-header">
+      <div class="results-count" id="resultsCount">Silakan masukkan kata kunci pencarian</div>
+    </div>
+    
+    <div class="loading hidden" id="loading">
+      <div class="spinner"></div>
+      <p>Mencari hasil...</p>
+    </div>
+    
+    <div class="result-list" id="webResults">
+      <div class="no-results">
+        <i class="fas fa-search"></i>
+        <h3>Selamat datang di SearchNow</h3>
+        <p>Mulai pencarian Anda di atas untuk menemukan informasi di seluruh web</p>
+      </div>
+    </div>
+    <div class="image-grid hidden" id="imageResults"></div>
+    
+    <div class="pagination" id="pagination"></div>
+  </div>
+
+  <div class="footer">
+    <div class="footer-links">
+      <a href="#" class="footer-link">Tentang</a>
+      <a href="#" class="footer-link">Privasi</a>
+      <a href="#" class="footer-link">Ketentuan</a>
+      <a href="#" class="footer-link">Setelan</a>
+      <a href="#" class="footer-link">Bantuan</a>
+    </div>
+    <div>© 2023 SearchNow. Mesin pencari pribadi Anda.</div>
+  </div>
+
+  <script type="module" src="/src/scripts/script.js"></script>
+</body>
+</html>
