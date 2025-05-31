@@ -86,7 +86,7 @@ function formatGoogleResults(data, type) {
       url: item.link,
       content: item.snippet,
       source: getDomainFromUrl(item.link) || 'Unknown source',
-      date: item.pagemap?.metatags?.[0]?.article:published_time || ''
+      date: item.pagemap?.metatags?.[0]?.['article:published_time'] || ''
     })) || [],
     totalResults: data.searchInformation?.totalResults || 0
   };
