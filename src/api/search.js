@@ -31,7 +31,7 @@ export const search = async (query, type = SEARCH_TYPES.WEB, page = 1) => {
       start: startIndex,
       num: 10,
       hl: 'id', // Bahasa Indonesia
-      safe: 'active' // Safe search aktif
+      safe: 'off' // Safe search aktif
     });
     
     // Sesuaikan parameter berdasarkan jenis pencarian
