@@ -1,6 +1,6 @@
 // Konfigurasi Google Custom Search API
 const GOOGLE_API_KEY = 'AIzaSyCjZ-dY6hXvYm7Cbl20_OpQHI3NSIovBWs';
-const GOOGLE_CSE_ID = '234faf42b08954785';
+const GOOGLE_CSE_ID = 'e23e4873e8eba4fd3';
 const GOOGLE_API_URL = 'https://www.googleapis.com/customsearch/v1';
 
 // Jenis pencarian yang didukung
