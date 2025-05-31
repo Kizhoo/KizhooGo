@@ -577,3 +577,60 @@ body {
     font-size: 14px;
   }
 }
+
+/* Tambahkan di bagian paling bawah style.css */
+
+.error-message {
+  background-color: #FFF3CD;
+  color: #856404;
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-left: 4px solid #FFC107;
+}
+
+.error-message i {
+  font-size: 20px;
+}
+
+.dark-mode .error-message {
+  background-color: #343A40;
+  color: #FFC107;
+  border-left-color: #FFC107;
+}
+
+.result-badge {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: var(--primary-color);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.image-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: var(--primary-color);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.image-result {
+  position: relative;
+}
+
+.result-card {
+  position: relative;
+  padding-bottom: 40px;
+}
