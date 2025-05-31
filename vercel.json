@@ -38,10 +38,6 @@
         {
           "key": "Access-Control-Allow-Methods",
           "value": "GET, OPTIONS"
-        },
-        {
-          "key": "X-Subscription-Token",
-          "value": "YOUR_BRAVE_API_KEY"
         }
       ]
     },
@@ -66,8 +62,5 @@
         }
       ]
     }
-  ],
-  "env": {
-    "BRAVE_API_KEY": "@your-brave-api-key"
-  }
+  ]
 }
