@@ -1,13 +1,12 @@
 /**
  * Search API with fallback to multiple engines
- * Supports: SearXNG, DuckDuckGo, and Brave Search
+ * Supports: SearXNG and DuckDuckGo
  */
 
 // List of available search engines
 const SEARCH_ENGINES = {
   SEARXNG: 'searxng',
-  DUCKDUCKGO: 'duckduckgo',
-  BRAVE: 'brave'
+  DUCKDUCKGO: 'duckduckgo'
 };
 
 // Configuration for each engine
@@ -32,27 +31,11 @@ const ENGINE_CONFIG = {
       no_redirect: 1,
       skip_disambig: 1
     }
-  },
-  [SEARCH_ENGINES.BRAVE]: {
-    endpoint: 'https://api.search.brave.com/res/v1/web/search',
-    headers: {
-      'Accept': 'application/json',
-      'Accept-Encoding': 'gzip',
-      'X-Subscription-Token': 'YOUR_BRAVE_API_KEY' // Replace with your actual key
-    },
-    params: {
-      country: 'id',
-      safesearch: 'moderate'
-    }
   }
 };
 
 /**
  * Perform search using multiple engines with fallback
- * @param {string} query - Search query
- * @param {string} category - Search category (web, images, news, videos)
- * @param {number} page - Page number
- * @returns {Promise} - Promise with search results
  */
 export const search = async (query, category = 'web', page = 1) => {
   // Try engines in order of preference
@@ -60,12 +43,7 @@ export const search = async (query, category = 'web', page = 1) => {
     return await searchWithEngine(SEARCH_ENGINES.SEARXNG, query, category, page);
   } catch (error) {
     console.warn('SearXNG failed, trying DuckDuckGo:', error);
-    try {
-      return await searchWithEngine(SEARCH_ENGINES.DUCKDUCKGO, query, category, page);
-    } catch (error) {
-      console.warn('DuckDuckGo failed, trying Brave:', error);
-      return await searchWithEngine(SEARCH_ENGINES.BRAVE, query, category, page);
-    }
+    return await searchWithEngine(SEARCH_ENGINES.DUCKDUCKGO, query, category, page);
   }
 };
 
@@ -78,8 +56,6 @@ async function searchWithEngine(engine, query, category, page) {
       return searchWithSearXNG(query, category, page);
     case SEARCH_ENGINES.DUCKDUCKGO:
       return searchWithDuckDuckGo(query);
-    case SEARCH_ENGINES.BRAVE:
-      return searchWithBrave(query, page);
     default:
       throw new Error('Unsupported search engine');
   }
@@ -101,9 +77,7 @@ async function searchWithSearXNG(query, category, page) {
       });
 
       const response = await fetch(`${instance}/search?${params.toString()}`, {
-        headers: {
-          'Accept': 'application/json'
-        }
+        headers: { 'Accept': 'application/json' }
       });
       
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -148,32 +122,6 @@ async function searchWithDuckDuckGo(query) {
 }
 
 /**
- * Brave Search Implementation
- */
-async function searchWithBrave(query, page) {
-  try {
-    const params = new URLSearchParams({
-      ...ENGINE_CONFIG[SEARCH_ENGINES.BRAVE].params,
-      q: query,
-      offset: (page - 1) * 10
-    });
-
-    const response = await fetch(`${ENGINE_CONFIG[SEARCH_ENGINES.BRAVE].endpoint}?${params.toString()}`, {
-      headers: ENGINE_CONFIG[SEARCH_ENGINES.BRAVE].headers
-    });
-    
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    
-    const data = await response.json();
-    return formatBraveResults(data);
-
-  } catch (error) {
-    console.error('Brave search failed:', error);
-    throw error;
-  }
-}
-
-/**
  * Result Formatters
  */
 function formatSearXNGResults(data) {
@@ -200,21 +148,7 @@ function formatDuckDuckGoResults(data) {
       source: item.FirstURL ? getDomainFromUrl(item.FirstURL) : 'Unknown source',
       image: item.Icon?.URL || null
     })),
-    hasMore: false // DDG doesn't support pagination well
-  };
-}
-
-function formatBraveResults(data) {
-  return {
-    engine: 'Brave',
-    results: data.web?.results?.map(result => ({
-      title: result.title || 'No title',
-      url: result.url || '#',
-      content: result.description || 'No description available',
-      source: result.url ? getDomainFromUrl(result.url) : 'Unknown source',
-      image: result.extra_snippets?.find(s => s.image)?.image || null
-    })) || [],
-    hasMore: data.web?.has_more || false
+    hasMore: false
   };
 }
 
@@ -254,4 +188,4 @@ export function getFallbackResults(query) {
     ],
     hasMore: false
   };
-        }
+}
