@@ -1,5 +1,5 @@
 // Konfigurasi Google Custom Search API
-const GOOGLE_API_KEY = 'AIzaSyCWja1Z5bqT_-Vy_J_hxWMb_Da0pjkrzvk';
+const GOOGLE_API_KEY = 'AIzaSyCjZ-dY6hXvYm7Cbl20_OpQHI3NSIovBWs';
 const GOOGLE_CSE_ID = '234faf42b08954785';
 const GOOGLE_API_URL = 'https://www.googleapis.com/customsearch/v1';
 
