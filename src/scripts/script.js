@@ -1,4 +1,4 @@
-import { search, getFallbackResults } from '../api/search.js';
+import { search } from '../api/search.js';
 
 // Elemen DOM
 const searchInput = document.getElementById('searchInput');
@@ -10,6 +10,7 @@ const loading = document.getElementById('loading');
 const resultsCount = document.getElementById('resultsCount');
 const pagination = document.getElementById('pagination');
 const searchTypeButtons = document.querySelectorAll('.search-type-btn');
+const searchSuggestions = document.getElementById('searchSuggestions');
 const searchHistory = document.getElementById('searchHistory');
 const historyList = document.getElementById('historyList');
 
@@ -49,6 +50,7 @@ searchTypeButtons.forEach(button => {
     button.classList.add('active');
     searchType = button.dataset.type;
     
+    // Jika sudah ada query, lakukan pencarian ulang
     if (currentQuery) {
       currentPage = 1;
       performSearch(currentQuery);
@@ -56,7 +58,7 @@ searchTypeButtons.forEach(button => {
   });
 });
 
-// Fungsi pencarian utama
+// Fungsi pencarian
 async function performSearch(query) {
   if (!query.trim()) {
     showWelcomeScreen();
@@ -64,9 +66,10 @@ async function performSearch(query) {
     return;
   }
   
+  // Tambahkan ke riwayat pencarian
   addToSearchHistory(query);
-  currentQuery = query;
   
+  currentQuery = query;
   loading.classList.remove('hidden');
   webResults.innerHTML = '';
   imageResults.innerHTML = '';
@@ -77,44 +80,39 @@ async function performSearch(query) {
   try {
     const data = await search(query, searchType, currentPage);
     
-    totalResults = data.results.length;
+    // Proses hasil
+    totalResults = data.results?.length || 0;
     resultsCount.textContent = totalResults > 0 ? 
       `Menampilkan ${Math.min(totalResults, RESULTS_PER_PAGE)} dari ${totalResults} hasil` : 
       `Tidak ada hasil untuk "${query}"`;
     
     if (searchType === 'images') {
-      displayImageResults(data.results);
+      displayImageResults(data.results || []);
     } else {
-      displayWebResults(data.results);
+      displayWebResults(data.results || []);
     }
     
+    // Tampilkan pagination jika diperlukan
     if (totalResults > RESULTS_PER_PAGE) {
       displayPagination(totalResults);
     }
     
   } catch (error) {
-    console.error('Search error:', error);
-    
-    // Gunakan fallback results
-    const fallbackData = getFallbackResults(query);
-    displayWebResults(fallbackData.results);
-    
-    // Tampilkan notifikasi error
-    resultsCount.textContent = `Gagal menghubungi server pencarian. Menampilkan hasil contoh.`;
-    
-    const errorMsg = document.createElement('div');
-    errorMsg.className = 'error-message';
-    errorMsg.innerHTML = `
-      <i class="fas fa-exclamation-triangle"></i>
-      <span>Mode offline: Menampilkan hasil contoh</span>
+    console.error('Error fetching search results:', error);
+    resultsCount.textContent = 'Gagal memuat hasil. Silakan coba lagi.';
+    webResults.innerHTML = `
+      <div class="no-results">
+        <i class="fas fa-exclamation-triangle"></i>
+        <h3>Terjadi kesalahan</h3>
+        <p>Silakan coba lagi atau gunakan kata kunci berbeda</p>
+      </div>
     `;
-    document.querySelector('.results-header').prepend(errorMsg);
   } finally {
     loading.classList.add('hidden');
   }
 }
 
-// Fungsi tampilkan hasil web
+// Tampilkan hasil web
 function displayWebResults(results) {
   webResults.classList.remove('hidden');
   imageResults.classList.add('hidden');
@@ -135,19 +133,16 @@ function displayWebResults(results) {
     resultCard.className = 'result-card';
     
     resultCard.innerHTML = `
-      <a href="${result.url}" class="result-title" target="_blank">${result.title}</a>
-      <a href="${result.url}" class="result-url" target="_blank">${result.source}</a>
-      <p class="result-snippet">${result.content}</p>
-      ${result.engine === 'Fallback' ? 
-        `<div class="result-badge">Hasil Contoh</div>` : 
-        `<div class="result-badge">SearXNG</div>`}
+      <a href="${result.url}" class="result-title" target="_blank">${result.title || 'Tanpa judul'}</a>
+      <a href="${result.url}" class="result-url" target="_blank">${getDomainFromUrl(result.url) || result.url}</a>
+      <p class="result-snippet">${result.content || 'Tidak ada deskripsi'}</p>
     `;
     
     webResults.appendChild(resultCard);
   });
 }
 
-// Fungsi tampilkan hasil gambar
+// Tampilkan hasil gambar
 function displayImageResults(results) {
   webResults.classList.add('hidden');
   imageResults.classList.remove('hidden');
@@ -168,9 +163,8 @@ function displayImageResults(results) {
     imageCard.className = 'image-result';
     
     imageCard.innerHTML = `
-      <img src="${result.image || 'https://via.placeholder.com/300x200?text=Gambar+Tidak+Tersedia'}" alt="${result.title}">
-      <div class="image-title">${result.title}</div>
-      <div class="image-badge">SearXNG</div>
+      <img src="${result.img_src || 'https://via.placeholder.com/300x200?text=Gambar+Tidak+Tersedia'}" alt="${result.title || ''}">
+      <div class="image-title">${result.title || 'Gambar tanpa judul'}</div>
     `;
     
     imageCard.addEventListener('click', () => {
@@ -181,7 +175,7 @@ function displayImageResults(results) {
   });
 }
 
-// Fungsi tampilkan pagination
+// Tampilkan pagination
 function displayPagination(total) {
   const totalPages = Math.ceil(total / RESULTS_PER_PAGE);
   pagination.innerHTML = '';
@@ -220,6 +214,16 @@ function displayPagination(total) {
   }
 }
 
+// Ekstrak domain dari URL
+function getDomainFromUrl(url) {
+  try {
+    const domain = new URL(url).hostname.replace('www.', '');
+    return domain;
+  } catch (e) {
+    return url;
+  }
+}
+
 // Tampilkan layar selamat datang
 function showWelcomeScreen() {
   webResults.innerHTML = `
@@ -236,10 +240,19 @@ function showWelcomeScreen() {
 
 // Tambahkan ke riwayat pencarian
 function addToSearchHistory(query) {
+  // Hapus duplikat
   searchHistoryData = searchHistoryData.filter(item => item !== query);
+  
+  // Tambahkan ke awal
   searchHistoryData.unshift(query);
+  
+  // Batasi hanya 5 item terbaru
   searchHistoryData = searchHistoryData.slice(0, 5);
+  
+  // Simpan ke localStorage
   localStorage.setItem('searchHistory', JSON.stringify(searchHistoryData));
+  
+  // Perbarui tampilan
   updateHistoryDisplay();
 }
 
@@ -275,6 +288,15 @@ searchInput.addEventListener('keypress', (e) => {
   }
 });
 
+// Event listener untuk suggestion
+document.querySelectorAll('.suggestion').forEach(suggestion => {
+  suggestion.addEventListener('click', () => {
+    searchInput.value = suggestion.textContent;
+    currentPage = 1;
+    performSearch(suggestion.textContent);
+  });
+});
+
 // Tampilkan riwayat pencarian saat input fokus
 searchInput.addEventListener('focus', () => {
   if (searchHistoryData.length > 0) {
@@ -293,8 +315,11 @@ document.addEventListener('click', (e) => {
 window.addEventListener('DOMContentLoaded', () => {
   initTheme();
   updateHistoryDisplay();
+  
+  // Fokus ke input pencarian
   searchInput.focus();
   
+  // Contoh pencarian jika ada query di URL
   const urlParams = new URLSearchParams(window.location.search);
   const queryParam = urlParams.get('q');
   if (queryParam) {
