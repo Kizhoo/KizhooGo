@@ -1,4 +1,13 @@
-import { search } from '../api/search.js';
+import { search, getFallbackResults } from '../api/search.js';
+
+// Konfigurasi
+const RESULTS_PER_PAGE = 10;
+const SEARCH_TYPES = {
+  WEB: 'web',
+  IMAGES: 'images',
+  NEWS: 'news',
+  VIDEOS: 'videos'
+};
 
 // Elemen DOM
 const searchInput = document.getElementById('searchInput');
@@ -14,13 +23,10 @@ const searchSuggestions = document.getElementById('searchSuggestions');
 const searchHistory = document.getElementById('searchHistory');
 const historyList = document.getElementById('historyList');
 
-// Konfigurasi
-const RESULTS_PER_PAGE = 10;
-
 // State aplikasi
 let currentPage = 1;
 let totalResults = 0;
-let searchType = 'web';
+let searchType = SEARCH_TYPES.WEB;
 let currentQuery = '';
 let darkMode = localStorage.getItem('darkMode') === 'true';
 let searchHistoryData = JSON.parse(localStorage.getItem('searchHistory')) || [];
@@ -50,7 +56,6 @@ searchTypeButtons.forEach(button => {
     button.classList.add('active');
     searchType = button.dataset.type;
     
-    // Jika sudah ada query, lakukan pencarian ulang
     if (currentQuery) {
       currentPage = 1;
       performSearch(currentQuery);
@@ -58,7 +63,7 @@ searchTypeButtons.forEach(button => {
   });
 });
 
-// Fungsi pencarian
+// Fungsi pencarian utama
 async function performSearch(query) {
   if (!query.trim()) {
     showWelcomeScreen();
@@ -66,10 +71,9 @@ async function performSearch(query) {
     return;
   }
   
-  // Tambahkan ke riwayat pencarian
   addToSearchHistory(query);
-  
   currentQuery = query;
+  
   loading.classList.remove('hidden');
   webResults.innerHTML = '';
   imageResults.innerHTML = '';
@@ -80,33 +84,48 @@ async function performSearch(query) {
   try {
     const data = await search(query, searchType, currentPage);
     
-    // Proses hasil
-    totalResults = data.results?.length || 0;
+    totalResults = parseInt(data.totalResults) || 0;
+    const displayedResults = Math.min(data.results.length, RESULTS_PER_PAGE);
+    
     resultsCount.textContent = totalResults > 0 ? 
-      `Menampilkan ${Math.min(totalResults, RESULTS_PER_PAGE)} dari ${totalResults} hasil` : 
+      `Menampilkan ${displayedResults} dari ${totalResults.toLocaleString('id-ID')} hasil` : 
       `Tidak ada hasil untuk "${query}"`;
     
-    if (searchType === 'images') {
-      displayImageResults(data.results || []);
+    if (searchType === SEARCH_TYPES.IMAGES) {
+      displayImageResults(data.results);
     } else {
-      displayWebResults(data.results || []);
+      displayWebResults(data.results);
     }
     
-    // Tampilkan pagination jika diperlukan
     if (totalResults > RESULTS_PER_PAGE) {
       displayPagination(totalResults);
     }
     
   } catch (error) {
-    console.error('Error fetching search results:', error);
-    resultsCount.textContent = 'Gagal memuat hasil. Silakan coba lagi.';
-    webResults.innerHTML = `
-      <div class="no-results">
-        <i class="fas fa-exclamation-triangle"></i>
-        <h3>Terjadi kesalahan</h3>
-        <p>Silakan coba lagi atau gunakan kata kunci berbeda</p>
-      </div>
+    console.error('Search error:', error);
+    
+    // Gunakan fallback results
+    const fallbackData = getFallbackResults(query);
+    
+    if (searchType === SEARCH_TYPES.IMAGES) {
+      displayImageResults(fallbackData.results);
+    } else {
+      displayWebResults(fallbackData.results);
+    }
+    
+    resultsCount.textContent = `Gagal menghubungi server pencarian. Menampilkan hasil contoh.`;
+    
+    const errorMsg = document.createElement('div');
+    errorMsg.className = 'error-message';
+    errorMsg.innerHTML = `
+      <i class="fas fa-exclamation-triangle"></i>
+      <span>Mode offline: Menampilkan hasil contoh</span>
     `;
+    
+    const resultsHeader = document.querySelector('.results-header');
+    if (resultsHeader) {
+      resultsHeader.prepend(errorMsg);
+    }
   } finally {
     loading.classList.add('hidden');
   }
@@ -128,14 +147,15 @@ function displayWebResults(results) {
     return;
   }
   
-  results.slice(0, RESULTS_PER_PAGE).forEach(result => {
+  results.forEach(result => {
     const resultCard = document.createElement('div');
     resultCard.className = 'result-card';
     
     resultCard.innerHTML = `
-      <a href="${result.url}" class="result-title" target="_blank">${result.title || 'Tanpa judul'}</a>
-      <a href="${result.url}" class="result-url" target="_blank">${getDomainFromUrl(result.url) || result.url}</a>
-      <p class="result-snippet">${result.content || 'Tidak ada deskripsi'}</p>
+      <a href="${result.url}" class="result-title" target="_blank">${result.title}</a>
+      <a href="${result.url}" class="result-url" target="_blank">${result.source}</a>
+      ${result.date ? `<div class="result-date">${formatDate(result.date)}</div>` : ''}
+      <p class="result-snippet">${result.content}</p>
     `;
     
     webResults.appendChild(resultCard);
@@ -158,13 +178,14 @@ function displayImageResults(results) {
     return;
   }
   
-  results.slice(0, RESULTS_PER_PAGE).forEach(result => {
+  results.forEach(result => {
     const imageCard = document.createElement('div');
     imageCard.className = 'image-result';
     
     imageCard.innerHTML = `
-      <img src="${result.img_src || 'https://via.placeholder.com/300x200?text=Gambar+Tidak+Tersedia'}" alt="${result.title || ''}">
-      <div class="image-title">${result.title || 'Gambar tanpa judul'}</div>
+      <img src="${result.image}" alt="${result.title}" loading="lazy">
+      <div class="image-title">${result.title}</div>
+      <div class="image-source">${result.source}</div>
     `;
     
     imageCard.addEventListener('click', () => {
@@ -175,11 +196,30 @@ function displayImageResults(results) {
   });
 }
 
-// Tampilkan pagination
+// Format tanggal
+function formatDate(dateString) {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('id-ID', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric'
+  });
+}
+
+// Tampilkan paginasi
 function displayPagination(total) {
   const totalPages = Math.ceil(total / RESULTS_PER_PAGE);
+  const maxPagesToShow = 5;
+  let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
+  let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
+  
+  if (endPage - startPage + 1 < maxPagesToShow) {
+    startPage = Math.max(1, endPage - maxPagesToShow + 1);
+  }
+  
   pagination.innerHTML = '';
   
+  // Tombol Previous
   if (currentPage > 1) {
     const prevBtn = document.createElement('button');
     prevBtn.className = 'page-btn';
@@ -191,7 +231,27 @@ function displayPagination(total) {
     pagination.appendChild(prevBtn);
   }
   
-  for (let i = 1; i <= totalPages; i++) {
+  // Tombol First Page
+  if (startPage > 1) {
+    const firstBtn = document.createElement('button');
+    firstBtn.className = 'page-btn';
+    firstBtn.textContent = '1';
+    firstBtn.addEventListener('click', () => {
+      currentPage = 1;
+      performSearch(currentQuery);
+    });
+    pagination.appendChild(firstBtn);
+    
+    if (startPage > 2) {
+      const ellipsis = document.createElement('span');
+      ellipsis.className = 'page-ellipsis';
+      ellipsis.textContent = '...';
+      pagination.appendChild(ellipsis);
+    }
+  }
+  
+  // Tombol nomor halaman
+  for (let i = startPage; i <= endPage; i++) {
     const pageBtn = document.createElement('button');
     pageBtn.className = `page-btn ${i === currentPage ? 'active' : ''}`;
     pageBtn.textContent = i;
@@ -202,6 +262,26 @@ function displayPagination(total) {
     pagination.appendChild(pageBtn);
   }
   
+  // Tombol Last Page
+  if (endPage < totalPages) {
+    if (endPage < totalPages - 1) {
+      const ellipsis = document.createElement('span');
+      ellipsis.className = 'page-ellipsis';
+      ellipsis.textContent = '...';
+      pagination.appendChild(ellipsis);
+    }
+    
+    const lastBtn = document.createElement('button');
+    lastBtn.className = 'page-btn';
+    lastBtn.textContent = totalPages;
+    lastBtn.addEventListener('click', () => {
+      currentPage = totalPages;
+      performSearch(currentQuery);
+    });
+    pagination.appendChild(lastBtn);
+  }
+  
+  // Tombol Next
   if (currentPage < totalPages) {
     const nextBtn = document.createElement('button');
     nextBtn.className = 'page-btn';
@@ -214,16 +294,6 @@ function displayPagination(total) {
   }
 }
 
-// Ekstrak domain dari URL
-function getDomainFromUrl(url) {
-  try {
-    const domain = new URL(url).hostname.replace('www.', '');
-    return domain;
-  } catch (e) {
-    return url;
-  }
-}
-
 // Tampilkan layar selamat datang
 function showWelcomeScreen() {
   webResults.innerHTML = `
@@ -231,6 +301,23 @@ function showWelcomeScreen() {
       <i class="fas fa-search"></i>
       <h3>Selamat datang di SearchNow</h3>
       <p>Mulai pencarian Anda di atas untuk menemukan informasi di seluruh web</p>
+      <div class="search-stats">
+        <div class="stat-card">
+          <i class="fas fa-globe"></i>
+          <div class="stat-value">Miliaran halaman</div>
+          <div class="stat-label">Diindeks</div>
+        </div>
+        <div class="stat-card">
+          <i class="fas fa-bolt"></i>
+          <div class="stat-value">Cepat</div>
+          <div class="stat-label">Hasil instan</div>
+        </div>
+        <div class="stat-card">
+          <i class="fas fa-lock"></i>
+          <div class="stat-value">Aman</div>
+          <div class="stat-label">Pencarian terlindungi</div>
+        </div>
+      </div>
     </div>
   `;
   imageResults.classList.add('hidden');
@@ -240,19 +327,10 @@ function showWelcomeScreen() {
 
 // Tambahkan ke riwayat pencarian
 function addToSearchHistory(query) {
-  // Hapus duplikat
   searchHistoryData = searchHistoryData.filter(item => item !== query);
-  
-  // Tambahkan ke awal
   searchHistoryData.unshift(query);
-  
-  // Batasi hanya 5 item terbaru
-  searchHistoryData = searchHistoryData.slice(0, 5);
-  
-  // Simpan ke localStorage
+  searchHistoryData = searchHistoryData.slice(0, 8);
   localStorage.setItem('searchHistory', JSON.stringify(searchHistoryData));
-  
-  // Perbarui tampilan
   updateHistoryDisplay();
 }
 
@@ -263,7 +341,10 @@ function updateHistoryDisplay() {
   searchHistoryData.forEach(query => {
     const historyItem = document.createElement('div');
     historyItem.className = 'history-item';
-    historyItem.textContent = query;
+    historyItem.innerHTML = `
+      <i class="fas fa-history"></i>
+      <span>${query}</span>
+    `;
     
     historyItem.addEventListener('click', () => {
       searchInput.value = query;
@@ -315,11 +396,8 @@ document.addEventListener('click', (e) => {
 window.addEventListener('DOMContentLoaded', () => {
   initTheme();
   updateHistoryDisplay();
-  
-  // Fokus ke input pencarian
   searchInput.focus();
   
-  // Contoh pencarian jika ada query di URL
   const urlParams = new URLSearchParams(window.location.search);
   const queryParam = urlParams.get('q');
   if (queryParam) {
