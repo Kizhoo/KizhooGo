@@ -1,159 +1,99 @@
-/**
- * Search API with fallback to multiple engines
- * Supports: SearXNG and DuckDuckGo
- */
+// Konfigurasi Google Custom Search API
+const GOOGLE_API_KEY = 'AIzaSyCWja1Z5bqT_-Vy_J_hxWMb_Da0pjkrzvk';
+const GOOGLE_CSE_ID = '234faf42b08954785';
+const GOOGLE_API_URL = 'https://cse.google.com/cse?cx=234faf42b08954785';
 
-// List of available search engines
-const SEARCH_ENGINES = {
-  SEARXNG: 'searxng',
-  DUCKDUCKGO: 'duckduckgo'
-};
-
-// Configuration for each engine
-const ENGINE_CONFIG = {
-  [SEARCH_ENGINES.SEARXNG]: {
-    instances: [
-      'https://searx.be',
-      'https://search.us.projectsegfau.lt',
-      'https://searx.space'
-    ],
-    params: {
-      format: 'json',
-      language: 'id',
-      safesearch: 1
-    }
-  },
-  [SEARCH_ENGINES.DUCKDUCKGO]: {
-    endpoint: 'https://api.duckduckgo.com/',
-    params: {
-      format: 'json',
-      no_html: 1,
-      no_redirect: 1,
-      skip_disambig: 1
-    }
-  }
+// Jenis pencarian yang didukung
+const SEARCH_TYPES = {
+  WEB: 'web',
+  IMAGES: 'images',
+  NEWS: 'news',
+  VIDEOS: 'videos'
 };
 
 /**
- * Perform search using multiple engines with fallback
+ * Lakukan pencarian menggunakan Google Custom Search API
+ * @param {string} query - Kata kunci pencarian
+ * @param {string} type - Jenis pencarian (web, images, news, videos)
+ * @param {number} page - Halaman hasil
+ * @returns {Promise} - Promise dengan hasil pencarian
  */
-export const search = async (query, category = 'web', page = 1) => {
-  // Try engines in order of preference
+export const search = async (query, type = SEARCH_TYPES.WEB, page = 1) => {
   try {
-    return await searchWithEngine(SEARCH_ENGINES.SEARXNG, query, category, page);
-  } catch (error) {
-    console.warn('SearXNG failed, trying DuckDuckGo:', error);
-    return await searchWithEngine(SEARCH_ENGINES.DUCKDUCKGO, query, category, page);
-  }
-};
-
-/**
- * Search using specific engine
- */
-async function searchWithEngine(engine, query, category, page) {
-  switch (engine) {
-    case SEARCH_ENGINES.SEARXNG:
-      return searchWithSearXNG(query, category, page);
-    case SEARCH_ENGINES.DUCKDUCKGO:
-      return searchWithDuckDuckGo(query);
-    default:
-      throw new Error('Unsupported search engine');
-  }
-}
-
-/**
- * SearXNG Search Implementation
- */
-async function searchWithSearXNG(query, category, page) {
-  let lastError = null;
-  
-  for (const instance of ENGINE_CONFIG[SEARCH_ENGINES.SEARXNG].instances) {
-    try {
-      const params = new URLSearchParams({
-        ...ENGINE_CONFIG[SEARCH_ENGINES.SEARXNG].params,
-        q: query,
-        categories: category,
-        pageno: page
-      });
-
-      const response = await fetch(`${instance}/search?${params.toString()}`, {
-        headers: { 'Accept': 'application/json' }
-      });
-      
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      
-      const data = await response.json();
-      if (!data.results || data.results.length === 0) {
-        throw new Error('No results from this instance');
-      }
-      
-      return formatSearXNGResults(data);
-
-    } catch (error) {
-      lastError = error;
-      console.warn(`SearXNG instance ${instance} failed:`, error);
-    }
-  }
-  
-  throw lastError || new Error('All SearXNG instances failed');
-}
-
-/**
- * DuckDuckGo Search Implementation
- */
-async function searchWithDuckDuckGo(query) {
-  try {
-    const params = new URLSearchParams({
-      ...ENGINE_CONFIG[SEARCH_ENGINES.DUCKDUCKGO].params,
-      q: query
-    });
-
-    const response = await fetch(`${ENGINE_CONFIG[SEARCH_ENGINES.DUCKDUCKGO].endpoint}?${params.toString()}`);
+    // Hitung start index untuk paginasi (10 hasil per halaman)
+    const startIndex = (page - 1) * 10 + 1;
     
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    // Parameter dasar
+    const params = new URLSearchParams({
+      key: GOOGLE_API_KEY,
+      cx: GOOGLE_CSE_ID,
+      q: query,
+      start: startIndex,
+      num: 10,
+      hl: 'id', // Bahasa Indonesia
+      safe: 'active' // Safe search aktif
+    });
+    
+    // Sesuaikan parameter berdasarkan jenis pencarian
+    switch (type) {
+      case SEARCH_TYPES.IMAGES:
+        params.append('searchType', 'image');
+        params.append('imgSize', 'medium');
+        break;
+      case SEARCH_TYPES.NEWS:
+        params.append('sort', 'date');
+        break;
+      case SEARCH_TYPES.VIDEOS:
+        params.append('searchType', 'video');
+        break;
+    }
+    
+    // Lakukan request ke Google API
+    const response = await fetch(`${GOOGLE_API_URL}?${params.toString()}`);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
     
     const data = await response.json();
-    return formatDuckDuckGoResults(data);
-
+    return formatGoogleResults(data, type);
+    
   } catch (error) {
-    console.error('DuckDuckGo search failed:', error);
+    console.error('Google search error:', error);
     throw error;
   }
-}
+};
 
 /**
- * Result Formatters
+ * Format hasil pencarian Google
  */
-function formatSearXNGResults(data) {
+function formatGoogleResults(data, type) {
+  if (type === SEARCH_TYPES.IMAGES) {
+    return {
+      results: data.items?.map(item => ({
+        title: item.title,
+        url: item.link,
+        image: item.link,
+        source: getDomainFromUrl(item.image.contextLink) || 'Unknown source'
+      })) || [],
+      totalResults: data.searchInformation?.totalResults || 0
+    };
+  }
+  
   return {
-    engine: 'SearXNG',
-    results: data.results.map(result => ({
-      title: result.title || 'No title',
-      url: result.url || '#',
-      content: result.content || 'No description available',
-      source: getDomainFromUrl(result.url) || 'Unknown source',
-      image: result.img_src || null
-    })),
-    hasMore: data.results.length >= 10
-  };
-}
-
-function formatDuckDuckGoResults(data) {
-  return {
-    engine: 'DuckDuckGo',
-    results: (data.RelatedTopics || []).concat(data.Results || []).map(item => ({
-      title: item.Text || item.FirstURL?.split('/').pop() || 'No title',
-      url: item.FirstURL || '#',
-      content: item.Text || item.Result || 'No description available',
-      source: item.FirstURL ? getDomainFromUrl(item.FirstURL) : 'Unknown source',
-      image: item.Icon?.URL || null
-    })),
-    hasMore: false
+    results: data.items?.map(item => ({
+      title: item.title,
+      url: item.link,
+      content: item.snippet,
+      source: getDomainFromUrl(item.link) || 'Unknown source',
+      date: item.pagemap?.metatags?.[0]?.article:published_time || ''
+    })) || [],
+    totalResults: data.searchInformation?.totalResults || 0
   };
 }
 
 /**
- * Helper function to extract domain from URL
+ * Helper function untuk ekstrak domain dari URL
  */
 function getDomainFromUrl(url) {
   try {
@@ -165,27 +105,24 @@ function getDomainFromUrl(url) {
 }
 
 /**
- * Fallback data when all engines fail
+ * Fallback data jika Google API gagal
  */
 export function getFallbackResults(query) {
   return {
-    engine: 'Fallback',
     results: [
       {
-        title: `Contoh hasil untuk "${query}" - Wikipedia`,
+        title: `Hasil contoh untuk "${query}" - Wikipedia`,
         url: `https://id.wikipedia.org/wiki/${encodeURIComponent(query)}`,
         content: `Ini adalah contoh hasil karena mesin pencari utama sedang tidak tersedia.`,
-        source: "wikipedia.org",
-        image: null
+        source: "wikipedia.org"
       },
       {
         title: `Pembelajaran tentang ${query}`,
         url: `https://example.com/search?q=${encodeURIComponent(query)}`,
         content: `Sistem sedang mengalami masalah koneksi. Ini adalah contoh hasil untuk "${query}".`,
-        source: "example.com",
-        image: null
+        source: "example.com"
       }
     ],
-    hasMore: false
+    totalResults: 2
   };
 }
