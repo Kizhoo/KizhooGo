@@ -1,37 +1,83 @@
-// List of reliable SearXNG instances
-const SEARXNG_INSTANCES = [
-  'https://searx.be',
-  'https://search.us.projectsegfau.lt',
-  'https://searx.space',
-  'https://searx.nixnet.services',
-  'https://search.garudalinux.org'
-];
+/**
+ * Search API with fallback to multiple engines
+ * Supports: SearXNG and DuckDuckGo
+ */
+
+// List of available search engines
+const SEARCH_ENGINES = {
+  SEARXNG: 'searxng',
+  DUCKDUCKGO: 'duckduckgo'
+};
+
+// Configuration for each engine
+const ENGINE_CONFIG = {
+  [SEARCH_ENGINES.SEARXNG]: {
+    instances: [
+      'https://searx.be',
+      'https://search.us.projectsegfau.lt',
+      'https://searx.space'
+    ],
+    params: {
+      format: 'json',
+      language: 'id',
+      safesearch: 1
+    }
+  },
+  [SEARCH_ENGINES.DUCKDUCKGO]: {
+    endpoint: 'https://api.duckduckgo.com/',
+    params: {
+      format: 'json',
+      no_html: 1,
+      no_redirect: 1,
+      skip_disambig: 1
+    }
+  }
+};
 
 /**
- * Perform search using SearXNG instances
- * @param {string} query - Search query
- * @param {string} category - Search category (web, images, news, videos)
- * @param {number} page - Page number
- * @returns {Promise} - Promise with search results
+ * Perform search using multiple engines with fallback
  */
 export const search = async (query, category = 'web', page = 1) => {
+  // Try engines in order of preference
+  try {
+    return await searchWithEngine(SEARCH_ENGINES.SEARXNG, query, category, page);
+  } catch (error) {
+    console.warn('SearXNG failed, trying DuckDuckGo:', error);
+    return await searchWithEngine(SEARCH_ENGINES.DUCKDUCKGO, query, category, page);
+  }
+};
+
+/**
+ * Search using specific engine
+ */
+async function searchWithEngine(engine, query, category, page) {
+  switch (engine) {
+    case SEARCH_ENGINES.SEARXNG:
+      return searchWithSearXNG(query, category, page);
+    case SEARCH_ENGINES.DUCKDUCKGO:
+      return searchWithDuckDuckGo(query);
+    default:
+      throw new Error('Unsupported search engine');
+  }
+}
+
+/**
+ * SearXNG Search Implementation
+ */
+async function searchWithSearXNG(query, category, page) {
   let lastError = null;
   
-  // Try all instances in order
-  for (const instance of SEARXNG_INSTANCES) {
+  for (const instance of ENGINE_CONFIG[SEARCH_ENGINES.SEARXNG].instances) {
     try {
       const params = new URLSearchParams({
+        ...ENGINE_CONFIG[SEARCH_ENGINES.SEARXNG].params,
         q: query,
-        format: 'json',
         categories: category,
-        pageno: page,
-        language: 'id',
-        safesearch: 1
+        pageno: page
       });
 
       const response = await fetch(`${instance}/search?${params.toString()}`, {
-        headers: { 'Accept': 'application/json' },
-        signal: AbortSignal.timeout(5000) // Timeout after 5 seconds
+        headers: { 'Accept': 'application/json' }
       });
       
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -41,33 +87,68 @@ export const search = async (query, category = 'web', page = 1) => {
         throw new Error('No results from this instance');
       }
       
-      return formatResults(data);
+      return formatSearXNGResults(data);
 
     } catch (error) {
       lastError = error;
-      console.warn(`SearXNG instance ${instance} failed:`, error.message);
-      // Wait a bit before trying next instance
-      await new Promise(resolve => setTimeout(resolve, 300));
+      console.warn(`SearXNG instance ${instance} failed:`, error);
     }
   }
   
   throw lastError || new Error('All SearXNG instances failed');
-};
+}
 
 /**
- * Format search results consistently
+ * DuckDuckGo Search Implementation
  */
-function formatResults(data) {
+async function searchWithDuckDuckGo(query) {
+  try {
+    const params = new URLSearchParams({
+      ...ENGINE_CONFIG[SEARCH_ENGINES.DUCKDUCKGO].params,
+      q: query
+    });
+
+    const response = await fetch(`${ENGINE_CONFIG[SEARCH_ENGINES.DUCKDUCKGO].endpoint}?${params.toString()}`);
+    
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    
+    const data = await response.json();
+    return formatDuckDuckGoResults(data);
+
+  } catch (error) {
+    console.error('DuckDuckGo search failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Result Formatters
+ */
+function formatSearXNGResults(data) {
   return {
+    engine: 'SearXNG',
     results: data.results.map(result => ({
-      title: result.title || 'Tidak ada judul',
+      title: result.title || 'No title',
       url: result.url || '#',
-      content: result.content || 'Tidak ada deskripsi tersedia',
-      source: getDomainFromUrl(result.url) || 'Sumber tidak diketahui',
-      image: result.img_src || null,
-      engine: 'SearXNG'
+      content: result.content || 'No description available',
+      source: getDomainFromUrl(result.url) || 'Unknown source',
+      image: result.img_src || null
     })),
     hasMore: data.results.length >= 10
+  };
+}
+
+function formatDuckDuckGoResults(data) {
+  return {
+    engine: 'DuckDuckGo',
+    results: (data.RelatedTopics || []).concat(data.Results || []).map(item => ({
+      title: item.Text || item.FirstURL?.split('/').pop() || 'No title',
+      url: item.FirstURL || '#',
+      content: item.Text || item.Result || 'No description available',
+      source: item.FirstURL ? getDomainFromUrl(item.FirstURL) : 'Unknown source',
+      image: item.Icon?.URL || null
+    })),
+    hasMore: false
   };
 }
 
@@ -84,26 +165,25 @@ function getDomainFromUrl(url) {
 }
 
 /**
- * Fallback data when all instances fail
+ * Fallback data when all engines fail
  */
 export function getFallbackResults(query) {
   return {
+    engine: 'Fallback',
     results: [
       {
         title: `Contoh hasil untuk "${query}" - Wikipedia`,
         url: `https://id.wikipedia.org/wiki/${encodeURIComponent(query)}`,
         content: `Ini adalah contoh hasil karena mesin pencari utama sedang tidak tersedia.`,
         source: "wikipedia.org",
-        image: null,
-        engine: 'Fallback'
+        image: null
       },
       {
         title: `Pembelajaran tentang ${query}`,
         url: `https://example.com/search?q=${encodeURIComponent(query)}`,
         content: `Sistem sedang mengalami masalah koneksi. Ini adalah contoh hasil untuk "${query}".`,
         source: "example.com",
-        image: null,
-        engine: 'Fallback'
+        image: null
       }
     ],
     hasMore: false
